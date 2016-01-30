@@ -27,26 +27,41 @@ typedef struct DummyJdk11Args {
     uint8_t bytes2[68];
 } DummyJdk11Args;
 
+
+/**
+ * We can't link against the jvm (-ljvm), because if you do that, it can't enable NMT.
+ * So we need to have function pointers that we can use to call the functions we need
+ * after dlopening it.
+ */
+
 // Function pointer to create the JVM
 typedef jint (JNICALL *CreateJavaVM_t)(JavaVM **pvm, void **env, void *args);
 // Function pointer to get the default args.  Namely default stacksize
 typedef jint (JNICALL *GetDefaultJavaVMInitArgs_t)(void *args);
-//  ????
-typedef jint (JNICALL *GetCreatedJavaVMs_t)(JavaVM **vmBuf, jsize bufLen,
-        jsize *nVMs);
 
-// Function to spawn the vm in the newly created thread.
-// args is of type ThreadArgs
-int continuation(void* args);
+// Probably gets the vm's that have been created?
+// This function is interesting, because if you spend time in the launcher
+// there is super cool code that does locking so there is only one jvm.
+// they check compare and exchange 8 bytes.
+//typedef jint (JNICALL *GetCreatedJavaVMs_t)(JavaVM **vmBuf, jsize bufLen,
+//        jsize *nVMs);
 
+/**
+ * Handy struct for holding the function pointers we get from dlopening the jvm.
+ */
 struct JVMFuncs {
     CreateJavaVM_t CreateJavaVM;
     GetDefaultJavaVMInitArgs_t GetDefaultJavaVMInitArgs;
-    GetCreatedJavaVMs_t GetCreatedJavaVMs;
 };
 
+
+// silly sentinel to make sure I didn't pass something bogus.
 #define SENTINEL 0XDADE100C
 
+/**
+ * This struct contains all of the args that are passed from the main thread to the new thread
+ * that spawns the jvm.
+ */
 struct ThreadArgs {
     long sentinel;
     JVMFuncs fnt;
@@ -56,12 +71,24 @@ struct ThreadArgs {
     size_t numJavaArgs;
 };
 
+/**
+ * This is the function passed to pthread_create
+ * args is actually a pointer to struct ThreadArgs
+ */
+int continuation(void* args);
+
 bool trace = false;
 
 const char* NMT_Env_Name = "NMT_LEVEL_";
 const int TOTAL_LEN = strlen(NMT_Env_Name) + 20;
 
-char *nmtEnv = NULL;
+char *getNmtEnv()
+{
+  char *nmtEnv = (char*) calloc(TOTAL_LEN, 1);
+  snprintf(nmtEnv, TOTAL_LEN, "%s%d", NMT_Env_Name, getpid());
+
+  return nmtEnv;
+}
 
 void setNMTEnv(const char *nmtflagValue) {
     if (NULL == nmtflagValue) {
@@ -71,8 +98,7 @@ void setNMTEnv(const char *nmtflagValue) {
     //http://hg.openjdk.java.net/jdk9/dev/jdk/rev/dde9f5cfde5f
     //http://cr.openjdk.java.net/~kshoop/8124977/webrev.00/src/java.base/share/native/libjli/jli_util.h.frames.html
 
-    nmtEnv = (char*) calloc(TOTAL_LEN, 1);
-    snprintf(nmtEnv, TOTAL_LEN, "%s%d", NMT_Env_Name, getpid());
+    char *nmtEnv = getNmtEnv();
     if (trace) {
         fprintf(stderr, "setenv %s=%s\n", nmtEnv, nmtflagValue);
     }
@@ -82,6 +108,8 @@ void setNMTEnv(const char *nmtflagValue) {
     if (trace) {
         fprintf(stderr, "%s=%s\n", nmtEnv, getenv(nmtEnv));
     }
+
+    free(nmtEnv);
 }
 
 int createVm(ThreadArgs *threadArgs) {
@@ -252,15 +280,15 @@ int setupVMFuncs(JVMFuncs &fnt) {
         return -2;
     }
 
-    fnt.GetCreatedJavaVMs = (GetCreatedJavaVMs_t) dlsym(libjvm,
-            "JNI_GetCreatedJavaVMs");
-    if (trace) {
-        fprintf(stderr, "GetCreatedJavaVMs is %p\n", fnt.GetCreatedJavaVMs);
-    }
-
-    if (NULL == fnt.GetCreatedJavaVMs) {
-        return -3;
-    }
+//    fnt.GetCreatedJavaVMs = (GetCreatedJavaVMs_t) dlsym(libjvm,
+//            "JNI_GetCreatedJavaVMs");
+//    if (trace) {
+//        fprintf(stderr, "GetCreatedJavaVMs is %p\n", fnt.GetCreatedJavaVMs);
+//    }
+//
+//    if (NULL == fnt.GetCreatedJavaVMs) {
+//        return -3;
+//    }
 
     return 0;
 }
@@ -312,11 +340,13 @@ int main(int argc, char **argv) {
     createJavaMainArgs(jargs, &threadArgs->javaArgs, threadArgs->numJavaArgs);
 
     if (trace) {
+        char *nmtEnv = getNmtEnv();
         fprintf(stderr, "pid: %d\n", getpid());
         fprintf(stderr, "env: %s=%s\n", nmtEnv, getenv(nmtEnv));
         for (int i = 0; i < vmArgs->nOptions; i++) {
             fprintf(stderr, "options[%2d] = '%s'\n", i, argv[i]);
         }
+        free(nmtEnv);
     }
 
     continueInNewThread(threadArgs);
