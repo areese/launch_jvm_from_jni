@@ -74,7 +74,7 @@ void setNMTEnv(const char *nmtflagValue) {
     nmtEnv = (char*) calloc(TOTAL_LEN, 1);
     snprintf(nmtEnv, TOTAL_LEN, "%s%d", NMT_Env_Name, getpid());
     if (trace) {
-        fprintf(stderr, "setenv %s=%s\n", nmtEnv, "detail");
+        fprintf(stderr, "setenv %s=%s\n", nmtEnv, nmtflagValue);
     }
 
     setenv(nmtEnv, strdup(nmtflagValue), 1);
@@ -279,7 +279,7 @@ int main(int argc, char **argv) {
     dumpArgs(jargs);
 
     // Setup NMT env.
-    setNMTEnv("detail");
+    setNMTEnv(jargs.enableNMT);
 
     ThreadArgs *threadArgs = (ThreadArgs*) calloc(1, sizeof(ThreadArgs));
     threadArgs->sentinel = SENTINEL;
@@ -310,8 +310,6 @@ int main(int argc, char **argv) {
     threadArgs->vmArgs = vmArgs;
 
     createJavaMainArgs(jargs, &threadArgs->javaArgs, threadArgs->numJavaArgs);
-
-    setNMTEnv("detail");
 
     if (trace) {
         fprintf(stderr, "pid: %d\n", getpid());
