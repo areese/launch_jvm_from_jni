@@ -25,10 +25,7 @@ JAVA_ARGS=-XX:NativeMemoryTracking=detail $(A) TestMain
 CPP_ARGS=
 CPP_ARGS+=-Dsun.java.launcher.diag=true
 CPP_ARGS+=-Djava.class.path=.
-CPP_ARGS+=-Dsun.java.launcher.diag=true
 CPP_ARGS+=-XX:NativeMemoryTracking=detail
-CPP_ARGS+=-Dsun.java.command=TestMain
-CPP_ARGS+=-Dsun.java.launcher=SUN_STANDARD
 
 
 all: compile

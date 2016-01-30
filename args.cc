@@ -33,7 +33,7 @@ uint64_t parseXss(const char *input) {
     int i = 0;
     const char *cp = input;
 
-    // skip flag part    
+    // skip flag part
     while (cp && '\0' != cp && !isdigit(*cp)) {
         ++cp;
     }
@@ -143,7 +143,7 @@ void setupVmOptions(JavaArgs &jargs, JavaVMOption **output, int &size,
         dest[j].extraInfo = NULL;
     }
 
-    for (int i = 0; i < nExtraOpts; i++) {
+    for (int i = 0; i < nExtraOpts && j < size && NULL != extraOpts[i]; i++, j++) {
         dest[j].optionString = extraOpts[i];
         dest[j].extraInfo = NULL;
     }
@@ -218,8 +218,7 @@ void createJavaMainArgs(JavaArgs &jargs, char ***values, size_t &numValues) {
 void charStringsToJavaStringArray(JNIEnv *jniEnv, jobjectArray &jarray,
         char **in, const size_t len) {
     jclass stringClass = jniEnv->FindClass("java/lang/String");
-    jarray =
-        jniEnv->NewObjectArray(len, stringClass, NULL);
+    jarray = jniEnv->NewObjectArray(len, stringClass, NULL);
     if (len == 0) {
         return;
     }
@@ -229,4 +228,26 @@ void charStringsToJavaStringArray(JNIEnv *jniEnv, jobjectArray &jarray,
         jstring temp = jniEnv->NewStringUTF(in[i]);
         jniEnv->SetObjectArrayElement(jarray, i, temp);
     }
+}
+
+void setupExtraOpts(const char *javaMainClassName, char ***extraOpts,
+        int &nExtraOpts) {
+    nExtraOpts=3;
+    char **ret = (char**) calloc(nExtraOpts+1, sizeof(char*));
+
+    const char *pidfmt = "-Dsun.java.launcher.pid=%d";
+    const size_t pidLen = strlen(pidfmt) + 64;
+
+    const char *mainfmt = "-Dsun.java.command=%s";
+    const size_t mainLen = strlen(mainfmt) + strlen(javaMainClassName) + 64;
+
+    ret[0] = (char*) calloc(pidLen, sizeof(char));
+    snprintf(ret[0], pidLen - 1, pidfmt, getpid());
+
+    ret[1] = strdup("-Dsun.java.launcher=SUN_STANDARD");
+
+    ret[2] = (char*) calloc(mainLen, sizeof(char));
+    snprintf(ret[2], mainLen - 1, mainfmt, javaMainClassName);
+
+    *extraOpts = ret;
 }

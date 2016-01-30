@@ -27,7 +27,6 @@ typedef struct DummyJdk11Args {
     uint8_t bytes2[68];
 } DummyJdk11Args;
 
-
 /**
  * We can't link against the jvm (-ljvm), because if you do that, it can't enable NMT.
  * So we need to have function pointers that we can use to call the functions we need
@@ -53,7 +52,6 @@ struct JVMFuncs {
     CreateJavaVM_t CreateJavaVM;
     GetDefaultJavaVMInitArgs_t GetDefaultJavaVMInitArgs;
 };
-
 
 // silly sentinel to make sure I didn't pass something bogus.
 #define SENTINEL 0XDADE100C
@@ -82,12 +80,11 @@ bool trace = false;
 const char* NMT_Env_Name = "NMT_LEVEL_";
 const int TOTAL_LEN = strlen(NMT_Env_Name) + 20;
 
-char *getNmtEnv()
-{
-  char *nmtEnv = (char*) calloc(TOTAL_LEN, 1);
-  snprintf(nmtEnv, TOTAL_LEN, "%s%d", NMT_Env_Name, getpid());
+char *getNmtEnv() {
+    char *nmtEnv = (char*) calloc(TOTAL_LEN, 1);
+    snprintf(nmtEnv, TOTAL_LEN, "%s%d", NMT_Env_Name, getpid());
 
-  return nmtEnv;
+    return nmtEnv;
 }
 
 void setNMTEnv(const char *nmtflagValue) {
@@ -320,10 +317,14 @@ int main(int argc, char **argv) {
     JavaVMOption *jvmopt;
 
     int nOptions = 0;
-    int nExtraOpts = 1;
-    char **extraOpts = (char**) calloc(1, sizeof(char*));
-    extraOpts[0] = (char*) calloc(1024, 1);
-    snprintf(extraOpts[0], 1024, "-Dsun.java.launcher.pid=%d", getpid());
+    int nExtraOpts = 0;
+    char **extraOpts = NULL;
+
+    // setup the special sun opts into extraOpts
+    setupExtraOpts(jargs.argv[jargs.mainClassNameIndex], &extraOpts,
+            nExtraOpts);
+
+    // setup the jvmopt struct for the JNI_CreateJavaVM call.
     setupVmOptions(jargs, &jvmopt, nOptions, extraOpts, nExtraOpts);
 
     dumpJavaVMOptions(jvmopt, nOptions);

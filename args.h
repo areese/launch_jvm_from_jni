@@ -76,6 +76,14 @@ void createJavaMainArgs(JavaArgs &jargs, char ***values, size_t &numValues);
 void charStringsToJavaStringArray(JNIEnv *jniEnv, jobjectArray &jarray,
         char **in, const size_t len);
 
+/**
+ * In order for jps to work correctly, you need to pass a couple of Sun options.
+ * This sets those up, as one of them is the pid.  (on linux, but we'll set it always).
+ */
+void setupExtraOpts(const char *javaMainClassName, char ***extraOpts,
+        int &nExtraOpts);
+
+
 // void dumpJavaVMArgs(JavaVMInitArgs &args);
 void dumpJavaVMOptions(const JavaVMOption * const options, const int nOptions);
 
